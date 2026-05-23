@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>高俯视伪3D跳跃赛道</title>
+  <style>
+    :root {
+      --scene-width: min(94vw, 1080px);
+      --scene-height: min(64vw, 640px);
+      color-scheme: dark;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        radial-gradient(circle at top, #35579a 0%, #18233d 42%, #070b14 100%);
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #eef5ff;
+    }
+
+    .wrap {
+      width: var(--scene-width);
+    }
+
+    h1 {
+      margin: 0 0 18px;
+      text-align: center;
+      font-size: clamp(24px, 3vw, 34px);
+      letter-spacing: 0.04em;
+      font-weight: 700;
+    }
+
+    .scene {
+      position: relative;
+      width: 100%;
+      height: var(--scene-height);
+      overflow: hidden;
+      border-radius: 30px;
+      background:
+        radial-gradient(circle at 50% 16%, rgba(154, 232, 255, 0.2), transparent 12%),
+        linear-gradient(to bottom, rgba(255, 255, 255, 0.08), transparent 16%),
+        linear-gradient(to bottom, #19356e 0%, #101c37 44%, #05080f 100%);
+      box-shadow:
+        0 24px 70px rgba(0, 0, 0, 0.34),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+      cursor: pointer;
+      touch-action: none;
+      transform: translate3d(0, 0, 0);
+    }
+
+    .scene.shake {
+      animation: scene-shake 220ms linear;
+    }
+
+    .scene::after {
+      content: "";
+      position: absolute;
+      inset: auto 0 0;
+      height: 22%;
+      background: linear-gradient(to top, rgba(0, 0, 0, 0.18), transparent);
+      pointer-events: none;
+    }
+
+    .game-canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hud {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      z-index: 3;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      pointer-events: none;
+    }
+
+    .hud-chip {
+      padding: 10px 14px;
+      border-radius: 14px;
+      background: rgba(9, 17, 35, 0.46);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 10px 22px rgba(0, 0, 0, 0.16);
+      backdrop-filter: blur(8px);
+    }
+
+    .hud-label {
+      display: block;
+      font-size: 11px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: rgba(217, 240, 255, 0.74);
+    }
+
+    .hud-value {
+      display: block;
+      margin-top: 4px;
+      font-size: 20px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .status-text {
+      max-width: 360px;
+      font-size: 13px;
+      line-height: 1.4;
+      color: rgba(237, 246, 255, 0.92);
+    }
+
+    .charge-ui {
+      position: absolute;
+      width: 44px;
+      height: 136px;
+      transform: translate(-50%, -100%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms ease;
+      z-index: 4;
+    }
+
+    .charge-ui.visible {
+      opacity: 1;
+    }
+
+    .charge-bar {
+      position: absolute;
+      inset: 0 0 24px;
+      padding: 4px;
+      border-radius: 999px;
+      background: rgba(8, 14, 28, 0.74);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 10px 20px rgba(0, 0, 0, 0.24);
+      overflow: hidden;
+    }
+
+    .charge-fill {
+      position: absolute;
+      left: 4px;
+      right: 4px;
+      bottom: 4px;
+      height: 0%;
+      border-radius: 999px;
+      background: linear-gradient(to top, #ff7f2e, #ffd64d 56%, #f7fff8);
+      box-shadow: 0 0 16px rgba(255, 204, 82, 0.42);
+    }
+
+    .charge-text {
+      position: absolute;
+      left: 50%;
+      bottom: 0;
+      transform: translateX(-50%);
+      min-width: 52px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: rgba(7, 12, 24, 0.78);
+      font-size: 11px;
+      font-weight: 700;
+      text-align: center;
+      color: #fef7d2;
+    }
+
+    .hint {
+      margin: 14px 0 0;
+      text-align: center;
+      color: rgba(255, 255, 255, 0.84);
+      font-size: 14px;
+      letter-spacing: 0.03em;
+    }
+
+    @keyframes scene-shake {
+      0% { transform: translate3d(0, 0, 0); }
+      20% { transform: translate3d(-4px, 1px, 0); }
+      40% { transform: translate3d(4px, -1px, 0); }
+      60% { transform: translate3d(-3px, 2px, 0); }
+      80% { transform: translate3d(3px, -1px, 0); }
+      100% { transform: translate3d(0, 0, 0); }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <h1>高俯视伪3D跳跃赛道</h1>
+    <section class="scene" aria-label="高俯视伪3D跳跃赛道">
+      <canvas class="game-canvas"></canvas>
+
+      <div class="hud">
+        <div class="hud-chip">
+          <span class="hud-label">距离</span>
+          <span class="hud-value score-value">0 m</span>
+        </div>
+        <div class="hud-chip status-text">按住任意位置蓄力，松开起跳；左右倾斜手机控制位置，越过前方方块障碍和断路。</div>
+      </div>
+
+      <div class="charge-ui" aria-hidden="true">
+        <div class="charge-bar">
+          <div class="charge-fill"></div>
+        </div>
+        <div class="charge-text">0%</div>
+      </div>
+    </section>
+    <p class="hint">悬空赛道固定在世界里，前进的是视角；左右倾斜手机控制位置，按住蓄力后松开起跳。</p>
+  </main>
+  <script>
+    const scene = document.querySelector(".scene");
+    const canvas = document.querySelector(".game-canvas");
+    const ctx = canvas.getContext("2d");
+    const chargeUi = document.querySelector(".charge-ui");
+    const chargeFill = document.querySelector(".charge-fill");
+    const chargeText = document.querySelector(".charge-text");
+    const scoreValue = document.querySelector(".score-value");
+    const statusText = document.querySelector(".status-text");
+
+    const minChargeMs = 50;
+    const maxChargeMs = 900;
+    const minJumpHeight = 3.2;
+    const maxJumpHeight = 8.4;
+    const minJumpDuration = 520;
+    const maxJumpDuration = 980;
+    const cameraSpeed = 12;
+    const visibleRange = 82;
+    const firstHazardDistance = 42;
+    const minHazardGapDistance = 26;
+    const maxHazardGapDistance = 38;
+    const playerLead = 7.2;
+    const trackWidth = 12;
+    const tileLength = 2;
+    const tileThickness = 1.15;
+    const collisionWindow = 1.1;
+    const blockDepth = 1.8;
+    const blockHeight = 3.5;
+    const pitLength = 5.8;
+    const jumpGravityScale = 8;
+    const maxTiltAngle = 45;
+    const ballWorldRadius = 0.82;
+    const ballLift = 0.9;
+    const laneCenters = [-3.4, 0, 3.4];
+
+    let activePointerId = null;
+    let chargeStartTime = 0;
+    let chargeRatio = 0;
+    let currentJump = null;
+    let fallState = null;
+    let audioContext = null;
+    let motionEnabled = false;
+    let motionPermissionRequested = false;
+
+    const state = {
+      cameraDistance: 0,
+      lastTime: performance.now(),
+      hazards: [],
+      nextHazardDistance: firstHazardDistance,
+      running: true,
+      failureMode: null,
+      nextHazardId: 1,
+      width: 0,
+      height: 0,
+      dpr: window.devicePixelRatio || 1,
+      centerX: 0,
+      horizonY: 0,
+      projectionScale: 0,
+      cameraHeight: 0,
+      tiltAngle: 0,
+      ballLateral: 0,
+    };
+
+    function setStatus(message) {
+      statusText.textContent = message;
+    }
+
+    function clamp(value, min, max) {
+      return Math.min(Math.max(value, min), max);
+    }
+
+    function lerp(start, end, t) {
+      return start + (end - start) * t;
+    }
+
+    function ensureAudioContext() {
+      if (!audioContext) {
+        const AudioCtor = window.AudioContext || window.webkitAudioContext;
+        if (AudioCtor) {
+          audioContext = new AudioCtor();
+        }
+      }
+
+      if (audioContext && audioContext.state === "suspended") {
+        audioContext.resume();
+      }
+    }
+
+    function getMaxBallOffset() {
+      return trackWidth / 2 - ballWorldRadius - 0.45;
+    }
+
+    function updateBallLateralFromTilt() {
+      state.ballLateral = (clamp(state.tiltAngle, -maxTiltAngle, maxTiltAngle) / maxTiltAngle) * getMaxBallOffset();
+    }
+
+    function handleDeviceOrientation(event) {
+      if (!Number.isFinite(event.gamma)) {
+        return;
+      }
+
+      state.tiltAngle = clamp(event.gamma, -maxTiltAngle, maxTiltAngle);
+      updateBallLateralFromTilt();
+    }
+
+    async function requestMotionPermission() {
+      if (motionEnabled || motionPermissionRequested) {
+        return;
+      }
+
+      motionPermissionRequested = true;
+
+      if (typeof window.DeviceOrientationEvent === "undefined") {
+        setStatus("当前设备不支持陀螺仪，仍可体验跳跃玩法。");
+        return;
+      }
+
+      try {
+        if (typeof DeviceOrientationEvent.requestPermission === "function") {
+          const permissionState = await DeviceOrientationEvent.requestPermission();
+          if (permissionState !== "granted") {
+            setStatus("未授予陀螺仪权限，当前仅可跳跃。");
+            return;
+          }
+        }
+
+        window.addEventListener("deviceorientation", handleDeviceOrientation, { passive: true });
+        motionEnabled = true;
+        setStatus("陀螺仪已启用，左右倾斜手机可控制小球位置。");
+      } catch (error) {
+        setStatus("陀螺仪启用失败，当前仅可跳跃。");
+      }
+    }
+
+    function playTone({ frequency, duration, gain, type }) {
+      if (!audioContext) {
+        return;
+      }
+
+      const now = audioContext.currentTime;
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+
+      oscillator.type = type;
+      oscillator.frequency.setValueAtTime(frequency, now);
+      gainNode.gain.setValueAtTime(gain, now);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      oscillator.start(now);
+      oscillator.stop(now + duration);
+    }
+
+    function playLandingFeedback() {
+      ensureAudioContext();
+      playTone({ frequency: 132, duration: 0.16, gain: 0.06, type: "triangle" });
+      playTone({ frequency: 88, duration: 0.22, gain: 0.03, type: "sine" });
+    }
+
+    function playCrashFeedback() {
+      ensureAudioContext();
+      playTone({ frequency: 72, duration: 0.28, gain: 0.085, type: "sawtooth" });
+      playTone({ frequency: 48, duration: 0.34, gain: 0.04, type: "square" });
+      if (navigator.vibrate) {
+        navigator.vibrate([40, 18, 40]);
+      }
+      triggerShake();
+    }
+
+    function triggerShake() {
+      scene.classList.remove("shake");
+      void scene.offsetWidth;
+      scene.classList.add("shake");
+    }
+
+    scene.addEventListener("animationend", (event) => {
+      if (event.animationName === "scene-shake") {
+        scene.classList.remove("shake");
+      }
+    });
+
+    function resizeCanvas() {
+      const rect = scene.getBoundingClientRect();
+      state.dpr = window.devicePixelRatio || 1;
+      state.width = rect.width;
+      state.height = rect.height;
+      canvas.width = Math.round(rect.width * state.dpr);
+      canvas.height = Math.round(rect.height * state.dpr);
+      ctx.setTransform(state.dpr, 0, 0, state.dpr, 0, 0);
+      state.centerX = rect.width / 2;
+      state.horizonY = rect.height * 0.17;
+      state.projectionScale = rect.height * 0.98;
+      state.cameraHeight = 7.2;
+    }
+
+    function project(x, y, z) {
+      const relativeZ = z - state.cameraDistance;
+      if (relativeZ <= 0.25) {
+        return null;
+      }
+
+      const scale = state.projectionScale / relativeZ;
+      return {
+        x: state.centerX + x * scale,
+        y: state.horizonY + (state.cameraHeight - y) * scale,
+        scale,
+        relativeZ,
+      };
+    }
+
+    function drawPolygon(points, fillStyle, strokeStyle = null, lineWidth = 1) {
+      if (points.some((point) => !point)) {
+        return;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+      for (let index = 1; index < points.length; index += 1) {
+        ctx.lineTo(points[index].x, points[index].y);
+      }
+      ctx.closePath();
+      ctx.fillStyle = fillStyle;
+      ctx.fill();
+
+      if (strokeStyle) {
+        ctx.strokeStyle = strokeStyle;
+        ctx.lineWidth = lineWidth;
+        ctx.stroke();
+      }
+    }
+
+    function hazardForDistance(distance) {
+      return state.hazards.find((hazard) => distance >= hazard.startZ && distance <= hazard.endZ);
+    }
+
+    function isTrackActive(zStart, zEnd) {
+      return !state.hazards.some((hazard) => {
+        if (hazard.type !== "pit") {
+          return false;
+        }
+        return zStart < hazard.endZ && zEnd > hazard.startZ;
+      });
+    }
+
+    function drawSky() {
+      const gradient = ctx.createLinearGradient(0, 0, 0, state.height);
+      gradient.addColorStop(0, "#2b59b0");
+      gradient.addColorStop(0.36, "#15254a");
+      gradient.addColorStop(1, "#060911");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, state.width, state.height);
+
+      const glow = ctx.createRadialGradient(
+        state.centerX,
+        state.horizonY - 10,
+        0,
+        state.centerX,
+        state.horizonY - 10,
+        state.width * 0.18
+      );
+      glow.addColorStop(0, "rgba(171, 239, 255, 0.42)");
+      glow.addColorStop(0.5, "rgba(171, 239, 255, 0.12)");
+      glow.addColorStop(1, "rgba(171, 239, 255, 0)");
+      ctx.fillStyle = glow;
+      ctx.fillRect(0, 0, state.width, state.height);
+
+      ctx.fillStyle = "rgba(196, 241, 255, 0.32)";
+      ctx.fillRect(state.centerX - state.width * 0.24, state.horizonY - 1, state.width * 0.48, 2);
+    }
+
+    function drawBackgroundGuides() {
+      for (let step = 12; step <= 72; step += 12) {
+        const left = project(-trackWidth * 0.9, 0, state.cameraDistance + step);
+        const right = project(trackWidth * 0.9, 0, state.cameraDistance + step);
+        if (!left || !right) {
+          continue;
+        }
+
+        ctx.strokeStyle = `rgba(206, 244, 255, ${0.16 - step / 620})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(left.x, left.y);
+        ctx.lineTo(right.x, right.y);
+        ctx.stroke();
+      }
+    }
+
+    function drawTile(zStart, zEnd) {
+      const topLeftFar = project(-trackWidth / 2, 0, zEnd);
+      const topRightFar = project(trackWidth / 2, 0, zEnd);
+      const topRightNear = project(trackWidth / 2, 0, zStart);
+      const topLeftNear = project(-trackWidth / 2, 0, zStart);
+
+      if (!topLeftFar || !topRightFar || !topRightNear || !topLeftNear) {
+        return;
+      }
+
+      const bottomLeftNear = project(-trackWidth / 2, -tileThickness, zStart);
+      const bottomRightNear = project(trackWidth / 2, -tileThickness, zStart);
+      const bottomLeftFar = project(-trackWidth / 2, -tileThickness, zEnd);
+      const bottomRightFar = project(trackWidth / 2, -tileThickness, zEnd);
+
+      drawPolygon(
+        [topLeftFar, topRightFar, topRightNear, topLeftNear],
+        "#f5fdff",
+        "rgba(255, 255, 255, 0.2)",
+        1
+      );
+      drawPolygon(
+        [topLeftNear, topRightNear, bottomRightNear, bottomLeftNear],
+        "#6ad4ff"
+      );
+      drawPolygon(
+        [topLeftFar, topLeftNear, bottomLeftNear, bottomLeftFar],
+        "#2ea6d9"
+      );
+      drawPolygon(
+        [topRightFar, topRightNear, bottomRightNear, bottomRightFar],
+        "#2c9bcc"
+      );
+
+      const edgeGlowLeft = lerp(topLeftFar.x, topLeftNear.x, 0.55);
+      const edgeGlowRight = lerp(topRightFar.x, topRightNear.x, 0.55);
+      const edgeGlowY = lerp(topLeftFar.y, topLeftNear.y, 0.55);
+      ctx.strokeStyle = "rgba(153, 239, 255, 0.5)";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(topLeftFar.x, topLeftFar.y);
+      ctx.lineTo(topLeftNear.x, topLeftNear.y);
+      ctx.moveTo(topRightFar.x, topRightFar.y);
+      ctx.lineTo(topRightNear.x, topRightNear.y);
+      ctx.stroke();
+
+      ctx.strokeStyle = "rgba(220, 249, 255, 0.16)";
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(edgeGlowLeft, edgeGlowY);
+      ctx.lineTo(edgeGlowRight, edgeGlowY);
+      ctx.stroke();
+    }
+
+    function drawPitEdge(z, isFrontEdge) {
+      const topLeft = project(-trackWidth / 2, 0.08, z);
+      const topRight = project(trackWidth / 2, 0.08, z);
+      const bottomRight = project(trackWidth / 2, -tileThickness * 0.35, z);
+      const bottomLeft = project(-trackWidth / 2, -tileThickness * 0.35, z);
+      if (!topLeft || !topRight || !bottomRight || !bottomLeft) {
+        return;
+      }
+
+      drawPolygon(
+        [topLeft, topRight, bottomRight, bottomLeft],
+        isFrontEdge ? "#c9f8ff" : "#89e5ff"
+      );
+    }
+
+    function drawBlock(hazard) {
+      const x0 = hazard.centerX - hazard.halfWidth;
+      const x1 = hazard.centerX + hazard.halfWidth;
+      const z0 = hazard.startZ;
+      const z1 = hazard.endZ;
+      const y0 = 0;
+      const y1 = blockHeight;
+
+      const topFarLeft = project(x0, y1, z1);
+      const topFarRight = project(x1, y1, z1);
+      const topNearRight = project(x1, y1, z0);
+      const topNearLeft = project(x0, y1, z0);
+      const bottomNearLeft = project(x0, y0, z0);
+      const bottomNearRight = project(x1, y0, z0);
+      const bottomFarLeft = project(x0, y0, z1);
+      const bottomFarRight = project(x1, y0, z1);
+
+      if (!topFarLeft || !topFarRight || !topNearRight || !topNearLeft || !bottomNearLeft || !bottomNearRight) {
+        return;
+      }
+
+      drawPolygon(
+        [topFarLeft, topFarRight, topNearRight, topNearLeft],
+        "#fff8b1"
+      );
+      drawPolygon(
+        [topNearLeft, topNearRight, bottomNearRight, bottomNearLeft],
+        "#ff8d3a"
+      );
+      drawPolygon(
+        [topFarRight, topNearRight, bottomNearRight, bottomFarRight],
+        "#c84716"
+      );
+      drawPolygon(
+        [topFarLeft, topNearLeft, bottomNearLeft, bottomFarLeft],
+        "#ffb24c"
+      );
+
+      ctx.strokeStyle = "rgba(255, 255, 255, 0.35)";
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(topFarLeft.x, topFarLeft.y);
+      ctx.lineTo(topFarRight.x, topFarRight.y);
+      ctx.lineTo(topNearRight.x, topNearRight.y);
+      ctx.lineTo(topNearLeft.x, topNearLeft.y);
+      ctx.closePath();
+      ctx.stroke();
+    }
+
+    function drawPit(hazard) {
+      drawPitEdge(hazard.startZ, true);
+      drawPitEdge(hazard.endZ, false);
+
+      const leftNear = project(-trackWidth / 2, -1.8, hazard.startZ + 0.2);
+      const rightNear = project(trackWidth / 2, -1.8, hazard.startZ + 0.2);
+      const leftFar = project(-trackWidth / 2, -1.8, hazard.endZ - 0.2);
+      const rightFar = project(trackWidth / 2, -1.8, hazard.endZ - 0.2);
+      const topFarLeft = project(-trackWidth / 2, 0, hazard.endZ);
+      const topFarRight = project(trackWidth / 2, 0, hazard.endZ);
+      const topNearRight = project(trackWidth / 2, 0, hazard.startZ);
+      const topNearLeft = project(-trackWidth / 2, 0, hazard.startZ);
+
+      if (!leftNear || !rightNear || !leftFar || !rightFar || !topFarLeft || !topFarRight || !topNearRight || !topNearLeft) {
+        return;
+      }
+
+      drawPolygon(
+        [topFarLeft, topFarRight, topNearRight, topNearLeft],
+        "rgba(6, 12, 22, 0.92)"
+      );
+      drawPolygon(
+        [leftFar, rightFar, rightNear, leftNear],
+        "rgba(0, 0, 0, 0.72)"
+      );
+    }
+
+    function drawTrack() {
+      const start = Math.floor(state.cameraDistance / tileLength) * tileLength;
+      const far = state.cameraDistance + visibleRange;
+
+      for (let z = far; z >= start; z -= tileLength) {
+        const zStart = z - tileLength;
+        const zEnd = z;
+        if (isTrackActive(zStart, zEnd)) {
+          drawTile(zStart, zEnd);
+        }
+      }
+    }
+
+    function drawHazards() {
+      const drawables = state.hazards
+        .filter((hazard) => hazard.endZ > state.cameraDistance + 1 && hazard.startZ < state.cameraDistance + visibleRange)
+        .sort((a, b) => b.startZ - a.startZ);
+
+      for (const hazard of drawables) {
+        if (hazard.type === "pit") {
+          drawPit(hazard);
+        } else {
+          drawBlock(hazard);
+        }
+      }
+    }
+
+    function getBallHeight(now) {
+      if (fallState) {
+        const elapsed = now - fallState.startTime;
+        const t = clamp(elapsed / fallState.duration, 0, 1);
+        return fallState.startHeight - 18 * t * t;
+      }
+
+      if (!currentJump) {
+        return 0;
+      }
+
+      const elapsedMs = now - currentJump.startTime;
+      const elapsedSec = elapsedMs / 1000;
+
+      if (elapsedSec <= 0) {
+        return 0;
+      }
+
+      const height = currentJump.initialVelocity * elapsedSec - 0.5 * currentJump.gravity * elapsedSec * elapsedSec;
+
+      if (height <= 0 && elapsedMs >= currentJump.durationMs) {
+        if (!currentJump.landed) {
+          currentJump.landed = true;
+          playLandingFeedback();
+          if (state.running) {
+            setStatus("落地成功，相机继续前冲。");
+          }
+        }
+        currentJump = null;
+        return 0;
+      }
+
+      return Math.max(0, height);
+    }
+
+    function drawBall(now) {
+      const height = getBallHeight(now);
+      const ballPosition = project(state.ballLateral, height + ballLift, state.cameraDistance + playerLead);
+      const shadowPosition = project(state.ballLateral, 0.06, state.cameraDistance + playerLead);
+
+      if (!ballPosition || !shadowPosition) {
+        return;
+      }
+
+      const shadowRadiusX = 42 * shadowPosition.scale * clamp(1 - height / 10, 0.28, 1);
+      const shadowRadiusY = 16 * shadowPosition.scale * clamp(1 - height / 10, 0.22, 1);
+
+      ctx.beginPath();
+      ctx.fillStyle = `rgba(0, 0, 0, ${clamp(0.26 - height * 0.02, 0, 0.26)})`;
+      ctx.ellipse(shadowPosition.x, shadowPosition.y + 8, shadowRadiusX, shadowRadiusY, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      const radius = clamp(0.82 * ballPosition.scale, 12, 52);
+      const ballGradient = ctx.createRadialGradient(
+        ballPosition.x - radius * 0.32,
+        ballPosition.y - radius * 0.42,
+        radius * 0.18,
+        ballPosition.x,
+        ballPosition.y,
+        radius
+      );
+      ballGradient.addColorStop(0, "#ffffff");
+      ballGradient.addColorStop(0.18, "#ffe97f");
+      ballGradient.addColorStop(0.42, "#ffba12");
+      ballGradient.addColorStop(0.76, "#ff7a00");
+      ballGradient.addColorStop(1, "#cb4700");
+
+      ctx.beginPath();
+      ctx.arc(ballPosition.x, ballPosition.y, radius, 0, Math.PI * 2);
+      ctx.fillStyle = ballGradient;
+      ctx.fill();
+
+      ctx.strokeStyle = "rgba(118, 33, 0, 0.28)";
+      ctx.lineWidth = Math.max(2, radius * 0.08);
+      ctx.beginPath();
+      ctx.arc(ballPosition.x, ballPosition.y, radius * 0.56, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(ballPosition.x - radius * 0.88, ballPosition.y);
+      ctx.lineTo(ballPosition.x + radius * 0.88, ballPosition.y);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.arc(ballPosition.x, ballPosition.y, radius * 0.98, Math.PI * 0.25, Math.PI * 0.75);
+      ctx.stroke();
+    }
+
+    function setJumpStrength(chargeMs) {
+      const clamped = clamp(chargeMs, minChargeMs, maxChargeMs);
+      const ratio = (clamped - minChargeMs) / (maxChargeMs - minChargeMs);
+      const eased = 1 - Math.pow(1 - ratio, 2);
+      const jumpHeight = lerp(minJumpHeight, maxJumpHeight, eased);
+      const jumpDurationMs = lerp(minJumpDuration, maxJumpDuration, 0.35 + eased * 0.65);
+      const jumpDurationSec = jumpDurationMs / 1000;
+      const gravity = (jumpGravityScale * jumpHeight) / (jumpDurationSec * jumpDurationSec);
+      const initialVelocity = 0.5 * gravity * jumpDurationSec;
+      return { jumpHeight, jumpDurationMs, gravity, initialVelocity };
+    }
+
+    function jumpBall(chargeMs) {
+      const { jumpHeight, jumpDurationMs, gravity, initialVelocity } = setJumpStrength(chargeMs);
+      currentJump = {
+        startTime: performance.now(),
+        durationMs: jumpDurationMs,
+        height: jumpHeight,
+        gravity,
+        initialVelocity,
+        landed: false,
+      };
+      setStatus("腾空中，准备越过前方危险。");
+    }
+
+    function createHazard() {
+      const type = Math.random() < 0.62 ? "block" : "pit";
+      const startZ = state.nextHazardDistance;
+      const endZ = startZ + (type === "pit" ? pitLength : blockDepth);
+      const laneIndex = Math.floor(Math.random() * laneCenters.length);
+
+      state.hazards.push({
+        id: state.nextHazardId++,
+        type,
+        startZ,
+        endZ,
+        centerX: type === "block" ? laneCenters[laneIndex] : 0,
+        halfWidth: type === "block" ? 1.15 : trackWidth / 2,
+        cleared: false,
+        hit: false,
+      });
+
+      state.nextHazardDistance = endZ + minHazardGapDistance + Math.random() * (maxHazardGapDistance - minHazardGapDistance);
+    }
+
+    function updateChargeUi(ratio) {
+      const percent = Math.round(ratio * 100);
+      chargeFill.style.height = `${percent}%`;
+      chargeText.textContent = `${percent}%`;
+    }
+
+    function positionChargeUi(event) {
+      const rect = scene.getBoundingClientRect();
+      const x = clamp(event.clientX - rect.left, 30, rect.width - 30);
+      const y = clamp(event.clientY - rect.top, 100, rect.height - 20);
+      chargeUi.style.left = `${x}px`;
+      chargeUi.style.top = `${y}px`;
+    }
+
+    function failByPit(currentHeight) {
+      state.running = false;
+      state.failureMode = "pit";
+      currentJump = null;
+      fallState = {
+        startTime: performance.now(),
+        duration: 900,
+        startHeight: currentHeight,
+      };
+      setStatus("没跳过去，掉进了断路。点击屏幕重新开始。");
+      playCrashFeedback();
+    }
+
+    function failByBlock() {
+      state.running = false;
+      state.failureMode = "block";
+      setStatus("撞上方块障碍了。点击屏幕重新开始。");
+      playCrashFeedback();
+    }
+
+    function handlePointerDown(event) {
+      if (!state.running) {
+        restartGame();
+        return;
+      }
+
+      if (activePointerId !== null || currentJump || fallState) {
+        return;
+      }
+
+      ensureAudioContext();
+      requestMotionPermission();
+      activePointerId = event.pointerId;
+      chargeStartTime = performance.now();
+      chargeRatio = 0;
+      positionChargeUi(event);
+      updateChargeUi(0);
+      chargeUi.classList.add("visible");
+      scene.setPointerCapture(event.pointerId);
+      setStatus("蓄力中，松开起跳。");
+    }
+
+    function releaseJump(event) {
+      if (event.pointerId !== activePointerId) {
+        return;
+      }
+
+      const chargeMs = performance.now() - chargeStartTime;
+      activePointerId = null;
+      chargeStartTime = 0;
+      chargeRatio = 0;
+      chargeUi.classList.remove("visible");
+
+      if (scene.hasPointerCapture(event.pointerId)) {
+        scene.releasePointerCapture(event.pointerId);
+      }
+
+      jumpBall(chargeMs);
+    }
+
+    function cancelCharge(event) {
+      if (event.pointerId !== activePointerId) {
+        return;
+      }
+
+      activePointerId = null;
+      chargeStartTime = 0;
+      chargeRatio = 0;
+      chargeUi.classList.remove("visible");
+
+      if (scene.hasPointerCapture(event.pointerId)) {
+        scene.releasePointerCapture(event.pointerId);
+      }
+
+      setStatus("已取消蓄力。");
+    }
+
+    function updateHazards(now, dtSeconds) {
+      if (state.running) {
+        state.cameraDistance += dtSeconds * cameraSpeed;
+        scoreValue.textContent = `${Math.floor(state.cameraDistance)} m`;
+
+        while (state.nextHazardDistance < state.cameraDistance + visibleRange + 14) {
+          createHazard();
+        }
+      }
+
+      const playerWorldZ = state.cameraDistance + playerLead;
+      const ballHeight = getBallHeight(now);
+      const ballX = state.ballLateral;
+
+      for (const hazard of state.hazards) {
+        if (hazard.hit || hazard.cleared) {
+          continue;
+        }
+
+        const overlaps = playerWorldZ >= hazard.startZ - collisionWindow && playerWorldZ <= hazard.endZ + collisionWindow;
+        if (!state.running || !overlaps) {
+          continue;
+        }
+
+        if (hazard.type === "pit") {
+          if (ballHeight < 1.9) {
+            hazard.hit = true;
+            failByPit(ballHeight);
+          } else {
+            if (playerWorldZ > hazard.endZ) {
+              hazard.cleared = true;
+              setStatus("成功越过断路，相机继续前冲。");
+            }
+          }
+        } else {
+          const lateralOverlap = Math.abs(ballX - hazard.centerX) <= hazard.halfWidth + ballWorldRadius * 0.55;
+          if (lateralOverlap && ballHeight < blockHeight - 0.3) {
+            hazard.hit = true;
+            failByBlock();
+          } else if (lateralOverlap) {
+            hazard.cleared = true;
+            setStatus("成功越过障碍，相机继续前冲。");
+          }
+        }
+
+        if (!hazard.hit && !hazard.cleared && playerWorldZ > hazard.endZ + collisionWindow) {
+          hazard.cleared = true;
+          if (hazard.type === "block") {
+            setStatus("侧移成功，避开了方块障碍。");
+          }
+        }
+      }
+
+      state.hazards = state.hazards.filter((hazard) => hazard.endZ > state.cameraDistance - 8);
+    }
+
+    function draw(now) {
+      drawSky();
+      drawBackgroundGuides();
+      drawTrack();
+      drawHazards();
+      drawBall(now);
+    }
+
+    function restartGame() {
+      state.cameraDistance = 0;
+      state.running = true;
+      state.failureMode = null;
+      state.hazards = [];
+      state.nextHazardDistance = firstHazardDistance;
+      state.tiltAngle = 0;
+      state.ballLateral = 0;
+      currentJump = null;
+      fallState = null;
+      activePointerId = null;
+      chargeStartTime = 0;
+      chargeRatio = 0;
+      chargeUi.classList.remove("visible");
+      scoreValue.textContent = "0 m";
+      setStatus("已重新开始，相机向前推进中，按住蓄力后松开起跳；左右倾斜手机可控制位置。");
+
+      while (state.nextHazardDistance < visibleRange + 14) {
+        createHazard();
+      }
+    }
+
+    function loop(now) {
+      const dtSeconds = Math.min(0.033, (now - state.lastTime) / 1000);
+      state.lastTime = now;
+
+      if (activePointerId !== null) {
+        const elapsed = now - chargeStartTime;
+        chargeRatio = clamp(elapsed / maxChargeMs, 0, 1);
+        updateChargeUi(chargeRatio);
+      }
+
+      updateHazards(now, dtSeconds);
+
+      if (fallState) {
+        const fallProgress = (now - fallState.startTime) / fallState.duration;
+        if (fallProgress >= 1) {
+          fallState = null;
+        }
+      }
+
+      draw(now);
+      requestAnimationFrame(loop);
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+    scene.addEventListener("pointerdown", handlePointerDown);
+    scene.addEventListener("pointerup", releaseJump);
+    scene.addEventListener("pointercancel", cancelCharge);
+    scene.addEventListener("lostpointercapture", () => {
+      activePointerId = null;
+      chargeStartTime = 0;
+      chargeRatio = 0;
+      chargeUi.classList.remove("visible");
+    });
+
+    resizeCanvas();
+    restartGame();
+    requestAnimationFrame((now) => {
+      state.lastTime = now;
+      requestAnimationFrame(loop);
+    });
+  </script>
+</body>
+</html>
